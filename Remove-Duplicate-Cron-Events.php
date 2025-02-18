@@ -7,35 +7,41 @@ Author: Farras Indyawan
 Author URI: https://wa.me/6281212833425
  */
 
-function remove_duplicate_cron_events($arg = null) {
-    // Jika argumen tidak null, keluarkan pesan debug
-    if ($arg !== null) {
-        error_log("Unexpected argument passed to remove_duplicate_cron_events: " . print_r($arg, true));
-    }
-
-    // Mendapatkan semua cron events
-    $crons = wp_get_scheduled_events();
+function remove_duplicate_cron_events() {
+    // Mendapatkan semua cron events dari opsi 'cron'
+    $crons = get_option('cron');
 
     // Jika tidak ada cron events, keluar dari fungsi
     if (empty($crons)) {
         return;
     }
 
+    // Mendapatkan daftar jadwal cron yang tersedia
+    $schedules = wp_get_schedules();
+
     // Array untuk menyimpan cron events unik
     $unique_crons = array();
 
     // Loop melalui setiap cron event
-    foreach ($crons as $cron) {
-        $hook = $cron->hook;
-        $args = $cron->args;
-        $key = $hook . serialize($args);
+    foreach ($crons as $timestamp => $cron) {
+        // Periksa apakah timestamp adalah angka dan jadwalnya valid
+        if (!is_numeric($timestamp) || !isset($schedules[$timestamp])) {
+            continue;
+        }
 
-        // Jika cron event sudah ada dalam array unik, hapusnya
-        if (isset($unique_crons[$key])) {
-            wp_unschedule_event($cron->time, $hook, $args);
-        } else {
-            // Jika tidak, tambahkan ke array unik
-            $unique_crons[$key] = true;
+        foreach ($cron as $hook => $events) {
+            foreach ($events as $key => $event) {
+                $args = $event['args'];
+                $event_key = $hook . serialize($args);
+
+                // Jika cron event sudah ada dalam array unik, hapusnya
+                if (isset($unique_crons[$event_key])) {
+                    wp_unschedule_event($timestamp, $hook, $args);
+                } else {
+                    // Jika tidak, tambahkan ke array unik
+                    $unique_crons[$event_key] = true;
+                }
+            }
         }
     }
 }
